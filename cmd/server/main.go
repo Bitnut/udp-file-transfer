@@ -43,7 +43,9 @@ func handleUDPConnection(conn *net.UDPConn) {
 
 	for {
 
+		// 如果正在关闭连接，则退出循环
 		if atomic.LoadInt32(&closing) == 1 {
+			fmt.Println("Closing connection, exiting...")
 			break
 		}
 
