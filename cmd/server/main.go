@@ -4,7 +4,14 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"sync/atomic"
+	"syscall"
 )
+
+// closing 用于标记是否正在关闭连接
+var closing int32
 
 func main() {
 
@@ -27,7 +34,18 @@ func main() {
 
 	fmt.Println("Listening on: ", udpAddr)
 
+	handleSignals(conn)
+
+	handleUDPConnection(conn)
+}
+
+func handleUDPConnection(conn *net.UDPConn) {
+
 	for {
+
+		if atomic.LoadInt32(&closing) == 1 {
+			break
+		}
 
 		buf := make([]byte, 1024) // 创建一个 1024 字节的缓冲区用于接收数据
 
@@ -41,4 +59,20 @@ func main() {
 		// 打印接收到的数据
 		fmt.Printf("Received %s from %s\n", buf[:n], addr)
 	}
+
+}
+
+func handleSignals(conn *net.UDPConn) {
+
+	// 捕获 SIGINT/SIGTERM 信号
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		fmt.Println("Received interrupt signal, closing connection...")
+		atomic.StoreInt32(&closing, 1)
+		conn.Close()
+		os.Exit(0)
+	}()
 }
